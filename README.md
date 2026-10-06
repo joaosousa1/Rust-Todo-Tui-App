@@ -1,7 +1,7 @@
 # Todo TUI
 
 An interactive and simple Rust todo app to learn how to use ratatui library.
-:
+
 ## Features
 
 - Add, edit, and delete tasks
