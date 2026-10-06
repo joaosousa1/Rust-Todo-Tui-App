@@ -5,9 +5,9 @@ use crossterm::{
 };
 use ratatui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Terminal,
 };
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,7 @@ struct App {
     input: String,
     input_mode: InputMode,
     action_type: Option<ActionType>,
+    confirm_delete: bool,
 }
 
 impl App {
@@ -58,6 +59,7 @@ impl App {
             input: String::new(),
             input_mode: InputMode::Normal,
             action_type: None,
+            confirm_delete: false,
         }
     }
 
@@ -177,9 +179,16 @@ impl App {
         self.action_type = None;
     }
 
-    fn delete(&mut self) {
+    fn request_delete(&mut self) {
+        if !self.items.is_empty() && self.list_state.selected().is_some() {
+            self.confirm_delete = true;
+        }
+    }
+
+    fn confirm_delete(&mut self) {
         if let Some(i) = self.list_state.selected() {
             if self.items.is_empty() {
+                self.confirm_delete = false;
                 return;
             }
             self.items.remove(i);
@@ -192,6 +201,11 @@ impl App {
             }
             self.save_to_file();
         }
+        self.confirm_delete = false;
+    }
+
+    fn cancel_delete(&mut self) {
+        self.confirm_delete = false;
     }
 }
 
@@ -226,6 +240,15 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                 continue;
             }
 
+            if app.confirm_delete {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') | KeyCode::Enter => app.confirm_delete(),
+                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => app.cancel_delete(),
+                    _ => {}
+                }
+                continue;
+            }
+
             match app.input_mode {
                 InputMode::Normal => match key.code {
                     KeyCode::Char('q') => return Ok(()),
@@ -234,7 +257,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                     KeyCode::Char('t') | KeyCode::Char(' ') => app.toggle(),
                     KeyCode::Char('a') => app.start_add(),
                     KeyCode::Char('e') => app.start_edit(),
-                    KeyCode::Char('d') => app.delete(),
+                    KeyCode::Char('d') => app.request_delete(),
                     _ => {}
                 },
                 InputMode::Editing => match key.code {
@@ -301,4 +324,51 @@ fn ui(f: &mut ratatui::Frame, app: &mut App) {
 
         f.render_widget(input_widget, chunks[1]);
     }
+
+    if app.confirm_delete {
+        let area = centered_rect(50, 30, f.area());
+        let selected_title = app
+            .list_state
+            .selected()
+            .and_then(|i| app.items.get(i))
+            .map(|item| item.title.as_str())
+            .unwrap_or("");
+
+        let popup = Paragraph::new(format!(
+            "Delete this task?\n\n\"{}\"\n\n[y/Enter] Confirm  [n/Esc] Cancel",
+            selected_title
+        ))
+        .style(Style::default().fg(Color::White))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Confirm Delete ")
+                .border_style(Style::default().fg(Color::Red))
+                .title_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        )
+        .alignment(Alignment::Center);
+
+        f.render_widget(Clear, area);
+        f.render_widget(popup, area);
+    }
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
 }
