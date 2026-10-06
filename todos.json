@@ -1,0 +1,10 @@
+[
+  {
+    "title": "Fazer exercicio toda a semana",
+    "completed": true
+  },
+  {
+    "title": "Aprender rust",
+    "completed": false
+  }
+]

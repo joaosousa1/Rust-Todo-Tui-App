@@ -1,0 +1,19 @@
+# Rust build artifacts
+/target
+
+# Cargo lockfile (uncomment for libraries)
+# Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
